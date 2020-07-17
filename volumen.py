@@ -7,8 +7,8 @@ import gi
 
 gi.require_version('Notify', '0.7')
 from gi.repository import Notify
-import os.path
 
+import os.path
 from nuclear import CliBuilder, subcommand
 from nuclear.sublog import log, log_error
 from nuclear.utils.shell import shell, shell_output
@@ -45,6 +45,7 @@ def volume_show():
     icon_name = get_notification_icon(master_volume)
     summary = 'Volume'
     body = f'{master_volume:d}%'
+    log.info(f'Volume: {body}')
     show_notification(icon_name, summary, body)
 
 
