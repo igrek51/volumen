@@ -22,10 +22,10 @@ def main():
             subcommand('up', run=volume_up, help='Increase volume level'),
             subcommand('down', run=volume_down, help='Decrease volume level'),
             subcommand('show', run=volume_show, help='Show current volume level'),
-            subcommand('spotify', run=volume_show, help='Show current volume level').has(
-                subcommand('pause', run=spotify_pause, help='Pause spotify'),
-                subcommand('previous', run=spotify_pause, help='Previous spotify song'),
-                subcommand('next', run=spotify_pause, help='Next spotify song'),
+            subcommand('spotify').has(
+                subcommand('pause', run=spotify_pause, help='Pause / Play spotify'),
+                subcommand('previous', run=spotify_previous, help='Previous spotify song'),
+                subcommand('next', run=spotify_next, help='Next spotify song'),
             ),
         ).run()
 
