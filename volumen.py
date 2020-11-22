@@ -64,10 +64,13 @@ def get_pulseaudio_sink_number():
 
 def read_pulseaudio_volume():
     master_volume_regex = r'^(.*)Volume: front-left: \d+ / +(\d+)% / (.*)$'
+    sink_volumes = []
     for line in shell_output('pactl list sinks').split('\n'):
         match = re.match(master_volume_regex, line)
         if match:
-            return int(match.group(2))
+            sink_volumes.append(int(match.group(2)))
+    if sink_volumes:
+    	return sink_volumes[-1]
     log.warn('Master volume could not have been read')
     return None
 
