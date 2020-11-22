@@ -79,13 +79,20 @@ def read_master_volume():
 def get_pulseaudio_sink_number():
     master_volume_regex = r'^(\d+)(.*)RUNNING$'
     matches = []
+    aux_matches = []
     for line in shell_output('pactl list sinks short').split('\n'):
         match = re.match(master_volume_regex, line)
         if match:
             matches.append(int(match.group(1)))
+        aux_match = re.match(r'^(\d+)(.*)$', line)
+        if aux_match:
+            aux_matches.append(int(aux_match.group(1)))
     if matches:
         return matches[-1]
-    log.warn('Running sink number not found')
+    log.warn('Running sink number not found, getting last')
+    if aux_matches:
+        return aux_matches[-1]
+    log.warn('No sink found')
     return None
 
 
