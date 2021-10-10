@@ -112,9 +112,11 @@ def show_notification(icon_name, summary, body):
     current_volume_file = '/tmp/volumen-current'
 
     if os.path.isfile(current_volume_file):
+        last_modified = os.path.getmtime(current_volume_file)
         save_current_body(current_volume_file, body)
-        # skip - another process is displaying notification
-        return
+        if time.time() - last_modified < 5:
+            # skip - another process is displaying notification
+            return
     save_current_body(current_volume_file, body)
 
     Notify.init("volumen")
