@@ -9,7 +9,7 @@ gi.require_version('Notify', '0.7')
 from gi.repository import Notify
 
 import os.path
-from nuclear import CliBuilder, subcommand
+from nuclear import CliBuilder, subcommand, flag
 from nuclear.sublog import log, log_error
 from nuclear.utils.shell import shell, shell_output
 
@@ -27,17 +27,40 @@ def main():
                 subcommand('previous', run=spotify_previous, help='Previous spotify song'),
                 subcommand('next', run=spotify_next, help='Next spotify song'),
             ),
+            flag('pulse', help='force using pulseaudio pactl'),
         ).run()
 
 
-def volume_up():
-    shell(f'amixer -q sset Master {volume_step}%+')
+def volume_up(pulse: bool):
+    adjust_volume(pulse, +volume_step)
     volume_show()
 
 
-def volume_down():
-    shell(f'amixer -q sset Master {volume_step}%-')
+def volume_down(pulse: bool):
+    adjust_volume(pulse, -volume_step)
     volume_show()
+
+
+def adjust_volume(pulse: bool, percents: int):
+    if pulse:
+        adjust_volume_pulse(percents)
+    else:
+        adjust_volume_alsa(percents)
+
+
+def adjust_volume_alsa(percents: int):
+    if percents > 0:
+        shell(f'amixer -q sset Master {percents}%+')
+    elif percents < 0:
+        shell(f'amixer -q sset Master {-percents}%-')
+
+
+def adjust_volume_pulse(percents: int):
+    sink_number = get_pulseaudio_sink_number()
+    if percents > 0:
+        shell(f'pactl set-sink-volume {sink_number} +{percents}%')
+    elif percents < 0:
+        shell(f'pactl set-sink-volume {sink_number} -{-percents}%')
 
 
 def volume_show():
@@ -54,11 +77,22 @@ def read_master_volume():
 
 
 def get_pulseaudio_sink_number():
-    master_volume_regex = r'^(\d+)(.*)$'
+    master_volume_regex = r'^(\d+)(.*)RUNNING$'
+    matches = []
+    aux_matches = []
     for line in shell_output('pactl list sinks short').split('\n'):
         match = re.match(master_volume_regex, line)
         if match:
-            return int(match.group(1))
+            matches.append(int(match.group(1)))
+        aux_match = re.match(r'^(\d+)(.*)$', line)
+        if aux_match:
+            aux_matches.append(int(aux_match.group(1)))
+    if matches:
+        return matches[-1]
+    log.warn('Running sink number not found, getting last')
+    if aux_matches:
+        return aux_matches[-1]
+    log.warn('No sink found')
     return None
 
 
