@@ -91,7 +91,7 @@ def get_pulseaudio_sink_number():
         return matches[-1]
     log.warn('Running sink number not found, getting last')
     if aux_matches:
-        return aux_matches[-1]
+        return aux_matches[0]
     log.warn('No sink found')
     return None
 
@@ -105,7 +105,7 @@ def read_pulseaudio_volume() -> int:
             sink_volumes.append(int(match.group(2)))
     if sink_volumes:
         log.debug('All sink volumes', volumes=sink_volumes)
-        while len(sink_volumes) > 1 and sink_volumes[-1] == 100:
+        while len(sink_volumes) > 1 and sink_volumes[-1] in {0, 100}:
             sink_volumes.pop()
         return sink_volumes[-1]
     log.warn('Master volume could not have been read')
