@@ -2,11 +2,11 @@
 import os
 import re
 import time
+from enum import Enum
 
-import gi
-
-gi.require_version('Notify', '0.7')
-from gi.repository import Notify
+import pgi
+pgi.require_version('Notify', '0.7')
+from pgi.repository import Notify
 
 import os.path
 from nuclear import CliBuilder, subcommand, flag
@@ -19,33 +19,54 @@ volume_step = 1
 def main():
     with log_error():
         CliBuilder('volumen', help='Volume notification tool').has(
+            subcommand('show', run=volume_show, help='Show current volume level'),
             subcommand('up', run=volume_up, help='Increase volume level'),
             subcommand('down', run=volume_down, help='Decrease volume level'),
-            subcommand('show', run=volume_show, help='Show current volume level'),
             subcommand('spotify').has(
                 subcommand('pause', run=spotify_pause, help='Pause / Play spotify'),
                 subcommand('previous', run=spotify_previous, help='Previous spotify song'),
                 subcommand('next', run=spotify_next, help='Next spotify song'),
+                subcommand('stop', run=spotify_stop, help='Stop spotify'),
+            ),
+            subcommand('player').has(
+                subcommand('toggle', run=toggle_player, help='Toggle any playerctl player'),
+            ),
+            subcommand('gnome').has(
+                subcommand('off', run=gnome_shutdown_dialog, help='Show Gnome shutdown dialog'),
+            ),
+            subcommand('cinnamon').has(
+                subcommand('off', run=cinnamon_shutdown_dialog, help='Show cinnamon shutdown dialog'),
             ),
             flag('pulse', help='force using pulseaudio pactl'),
+            flag('alsa', help='force using alsa'),
         ).run()
 
 
-def volume_up(pulse: bool):
-    adjust_volume(pulse, +volume_step)
-    volume_show()
-
-
-def volume_down(pulse: bool):
-    adjust_volume(pulse, -volume_step)
-    volume_show()
-
-
-def adjust_volume(pulse: bool, percents: int):
+def volume_up(pulse: bool, alsa: bool):
     if pulse:
-        adjust_volume_pulse(percents)
+        adjust_volume_pulse(+volume_step)
+    elif alsa:
+        adjust_volume_alsa(+volume_step)
     else:
-        adjust_volume_alsa(percents)
+        adjust_volume_default(+volume_step)
+    volume_show()
+
+
+def volume_down(pulse: bool, alsa: bool):
+    if pulse:
+        adjust_volume_pulse(-volume_step)
+    elif alsa:
+        adjust_volume_alsa(-volume_step)
+    else:
+        adjust_volume_default(-volume_step)
+    volume_show()
+
+
+def adjust_volume_default(percents: int):
+    if percents > 0:
+        shell(f'pactl set-sink-volume @DEFAULT_SINK@ +{percents}%')
+    elif percents < 0:
+        shell(f'pactl set-sink-volume @DEFAULT_SINK@ -{-percents}%')
 
 
 def adjust_volume_alsa(percents: int):
@@ -64,16 +85,12 @@ def adjust_volume_pulse(percents: int):
 
 
 def volume_show():
-    master_volume = read_master_volume()
+    master_volume = read_volume_pulse_default()
     icon_name = get_notification_icon(master_volume)
     summary = 'Volume'
     body = f'{master_volume:d}%'
     log.info(f'Volume: {body}')
     show_notification(icon_name, summary, body)
-
-
-def read_master_volume():
-    return read_pulseaudio_volume()
 
 
 def get_pulseaudio_sink_number():
@@ -110,6 +127,14 @@ def read_pulseaudio_volume() -> int:
         return sink_volumes[-1]
     log.warn('Master volume could not have been read')
     return None
+
+
+def read_volume_pulse_default() -> int:
+    master_volume_regex = r'^(.*)Volume: front-left: \d+ / +(\d+)%(.*)$'
+    out = shell_output('pactl get-sink-volume @DEFAULT_SINK@').strip().splitlines()[0]
+    match = re.match(master_volume_regex, out)
+    assert match, 'volume failed to read: cant parse pactl output'
+    return int(match.group(2))
 
 
 def read_alsa_volume():
@@ -184,21 +209,35 @@ def show_notification(icon_name, summary, body):
 
 
 def spotify_pause():
-    shell(
-        'dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 '
-        'org.mpris.MediaPlayer2.Player.PlayPause')
+    shell('dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 '
+          'org.mpris.MediaPlayer2.Player.PlayPause')
+
+
+def spotify_stop():
+    shell('dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 '
+          'org.mpris.MediaPlayer2.Player.Stop')
 
 
 def spotify_next():
-    shell(
-        'dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 '
-        'org.mpris.MediaPlayer2.Player.Next')
+    shell('dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 '
+          'org.mpris.MediaPlayer2.Player.Next')
 
 
 def spotify_previous():
-    shell(
-        'dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 '
-        'org.mpris.MediaPlayer2.Player.Previous')
+    shell('dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 '
+          'org.mpris.MediaPlayer2.Player.Previous')
+
+
+def toggle_player():
+    shell('playerctl play-pause')
+
+
+def cinnamon_shutdown_dialog():
+    shell('cinnamon-session-quit --power-off')
+
+
+def gnome_shutdown_dialog():
+    shell('gnome-session-quit --power-off')
 
 
 if __name__ == '__main__':
