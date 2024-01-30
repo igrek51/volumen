@@ -2,22 +2,19 @@
 import os
 import re
 import time
-from enum import Enum
 
 import pgi
 pgi.require_version('Notify', '0.7')
 from pgi.repository import Notify
 
 import os.path
-from nuclear import CliBuilder, subcommand, flag
-from nuclear.sublog import log, log_error
-from nuclear.utils.shell import shell, shell_output
+from nuclear import CliBuilder, subcommand, flag, log, error_handler, shell
 
 volume_step = 1
 
 
 def main():
-    with log_error():
+    with error_handler():
         CliBuilder('volumen', help='Volume notification tool').has(
             subcommand('show', run=volume_show, help='Show current volume level'),
             subcommand('up', run=volume_up, help='Increase volume level'),
@@ -97,7 +94,7 @@ def get_pulseaudio_sink_number():
     master_volume_regex = r'^(\d+)(.*)RUNNING$'
     matches = []
     aux_matches = []
-    for line in shell_output('pactl list sinks short').split('\n'):
+    for line in shell('pactl list sinks short').split('\n'):
         match = re.match(master_volume_regex, line)
         if match:
             matches.append(int(match.group(1)))
@@ -116,7 +113,7 @@ def get_pulseaudio_sink_number():
 def read_pulseaudio_volume() -> int:
     master_volume_regex = r'^(.*)Volume: front-left: \d+ / +(\d+)%(.*)$'
     sink_volumes = []
-    for line in shell_output('pactl list sinks').split('\n'):
+    for line in shell('pactl list sinks').split('\n'):
         match = re.match(master_volume_regex, line)
         if match:
             sink_volumes.append(int(match.group(2)))
@@ -131,7 +128,7 @@ def read_pulseaudio_volume() -> int:
 
 def read_volume_pulse_default() -> int:
     master_volume_regex = r'^(.*)Volume: front-left: \d+ / +(\d+)%(.*)$'
-    out = shell_output('pactl get-sink-volume @DEFAULT_SINK@').strip().splitlines()[0]
+    out = shell('pactl get-sink-volume @DEFAULT_SINK@').strip().splitlines()[0]
     match = re.match(master_volume_regex, out)
     assert match, 'volume failed to read: cant parse pactl output'
     return int(match.group(2))
@@ -139,7 +136,7 @@ def read_volume_pulse_default() -> int:
 
 def read_alsa_volume():
     master_volume_regex = r'^.*Mono: Playback \d+ \[(\d+)%\] \[(-?\d+\.?\d*)dB\] \[on\]$'
-    for line in shell_output('amixer get Master').split('\n'):
+    for line in shell('amixer get Master').split('\n'):
         match = re.match(master_volume_regex, line)
         if match:
             return int(match.group(1))
