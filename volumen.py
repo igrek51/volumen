@@ -2,12 +2,12 @@
 import os
 import re
 import time
-
-import pgi
-pgi.require_version('Notify', '0.7')
-from pgi.repository import Notify
-
 import os.path
+
+import gi
+gi.require_version('Notify', '0.7')
+from gi.repository import Notify
+
 from nuclear import CliBuilder, subcommand, flag, log, error_handler, shell
 
 volume_step = 1

@@ -1,2 +1,2 @@
 nuclear>=2.0.0
-pgi
+PyGObject==3.48.2
