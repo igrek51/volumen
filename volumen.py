@@ -61,9 +61,9 @@ def volume_down(pulse: bool, alsa: bool):
 
 def adjust_volume_default(percents: int):
     if percents > 0:
-        shell(f'pactl set-sink-volume @DEFAULT_SINK@ +{percents}%')
+        shell(f'wpctl set-volume @DEFAULT_AUDIO_SINK@ {percents}%+')
     elif percents < 0:
-        shell(f'pactl set-sink-volume @DEFAULT_SINK@ -{-percents}%')
+        shell(f'wpctl set-volume @DEFAULT_AUDIO_SINK@ {-percents}%-')
 
 
 def adjust_volume_alsa(percents: int):
@@ -82,7 +82,7 @@ def adjust_volume_pulse(percents: int):
 
 
 def volume_show():
-    master_volume = read_volume_pulse_default()
+    master_volume = read_volume_pipewire()
     icon_name = get_notification_icon(master_volume)
     summary = 'Volume'
     body = f'{master_volume:d}%'
@@ -110,20 +110,11 @@ def get_pulseaudio_sink_number():
     return None
 
 
-def read_pulseaudio_volume() -> int:
-    master_volume_regex = r'^(.*)Volume: front-left: \d+ / +(\d+)%(.*)$'
-    sink_volumes = []
-    for line in shell('pactl list sinks').split('\n'):
-        match = re.match(master_volume_regex, line)
-        if match:
-            sink_volumes.append(int(match.group(2)))
-    if sink_volumes:
-        log.debug('All sink volumes', volumes=sink_volumes)
-        while len(sink_volumes) > 1 and sink_volumes[-1] in {0, 100}:
-            sink_volumes.pop()
-        return sink_volumes[-1]
-    log.warn('Master volume could not have been read')
-    return None
+def read_volume_pipewire() -> int:
+    out = shell('wpctl get-volume @DEFAULT_AUDIO_SINK@').strip()
+    match = re.match(r'^Volume: ([0-9\.]+)$', out)
+    assert match, 'volume failed to read: cant parse wpctl output'
+    return int(float(match.group(1)) * 100)
 
 
 def read_volume_pulse_default() -> int:
